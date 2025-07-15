@@ -106,5 +106,8 @@ pip install numpy matplotlib
 This implementation demonstrates a **discrete-time, single-integrator CBF method** for tactical deconfliction in urban airspace corridors. It is suitable for fast-time simulation and evaluation of **centralised ground-based safety nets** in UTM.
 
 > Frémond, R. (2025). *Centralised Tactical Conflict Resolution Using Control Barrier Functions in Grid-Based Airspace*. Internal Project Note.
+>
+
+**Keywords**: Control Barrier Function, Tactical Conflict Resolution, Unmanned Aircraft System Traffic Management (UTM), Separation Assurance, Grid-Based Airspace.
 
 ---
