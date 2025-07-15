@@ -10,13 +10,13 @@ This simulation models **Tactical Conflict Resolution** for a grid-based urban a
 
 Let:
 
-- \( i, j \in \{1, \ldots, N\} \) index the vehicles  
-- \( \mathbf{p}_i(t) \in \mathbb{R}^2 \): position of vehicle *i* at time *t*  
-- \( s_i(t) \in \mathbb{R} \): scalar path parameter for vehicle *i*  
-- \( v_i(t) = \dot{s}_i(t) \): scalar speed of vehicle *i*  
-- \( \mathcal{L}_{ij} = \|\mathbf{p}_i(t) - \mathbf{p}_j(t)\|^2 - d^2 \): safety constraint, with \( d > 0 \) as the **loss-of-separation (LoS)** threshold
+- $i, j \in [1, \ldots, N ]$ index the vehicles  
+- $\mathbf{p}_i(t) \in \mathbb{R}^2$: position of vehicle *i* at time *t*  
+- $s_i(t) \in \mathbb{R}$: scalar path parameter for vehicle *i*  
+- $v_i(t) = \dot{s}_i(t)$: scalar speed of vehicle *i*  
+- $\mathcal{L}_{ij} = \|\mathbf{p}_i(t) - \mathbf{p}_j(t)\|^2 - d^2$: safety constraint, with $d > 0$ as the **loss-of-separation** threshold
 
-A **Control Barrier Function (CBF)** is defined for each conflicting pair \( (i, j) \) as:
+A **Control Barrier Function (CBF)** is defined for each conflicting pair $(i, j)$ as:
 
 ```math
 h_{ij}(t) = \|\mathbf{p}_i(t) - \mathbf{p}_j(t)\|^2 - d^2
@@ -28,9 +28,9 @@ To ensure safety, we enforce the CBF condition:
 \dot{h}_{ij}(t) + \alpha h_{ij}(t) \geq 0
 ```
 
-where \( \alpha > 0 \) is a tunable CBF gain.
+where $\alpha > 0$ is a tunable CBF gain.
 
-The goal is to find an admissible control (speed) \( v_i(t) \) such that **all pairwise CBF constraints are satisfied**.
+The goal is to find an admissible control (speed) $v_i(t)$ such that **all pairwise CBF constraints are satisfied**.
 
 ---
 
@@ -44,15 +44,14 @@ Initialises the simulation, runs each timestep, and visualises the result.
 
 Encapsulates simulation logic:
 - Detects potential conflicts
-- Computes feasible speed intervals \([LB_i, UB_i]\)
+- Computes feasible speed intervals $[LB_i, UB_i]$
 - Applies clipped speed control:  
-  \[
-  v_i(t) = \text{clip}(v_{\text{nominal}}, LB_i, UB_i)
-  \]
+  $v_i(t) = \text{clip}(v_{\text{nominal}}, LB_i, UB_i)$
+
 
 ### `ControlBarrier`
 
-Holds the LoS threshold and the gain \( \alpha \) used in the inequality constraint.
+Holds the LoS threshold and the gain $\alpha$ used in the inequality constraint.
 
 ### `Traffic`
 
@@ -70,13 +69,11 @@ Only **orthogonal vehicles** may conflict (horizontal vs vertical).
 
 Each vehicle computes its **arrival time** at the intersection:
 
-\[
-t_i = \frac{s^\text{int}_i - s_i}{v_i}, \quad t_j = \frac{s^\text{int}_j - s_j}{v_j}
-\]
+$t_i = \frac{s^\text{int}_i - s_i}{v_i}, \quad t_j = \frac{s^\text{int}_j - s_j}{v_j}$
 
-A conflict is resolved **only if** \( t_i > t_j \), assigning priority to vehicle *j*.
+A conflict is resolved **only if** $t_i > t_j$, assigning priority to vehicle *j*.
 
-The CBF condition then yields a linear constraint on \( v_i \), used to adjust its bounds for safety.
+The CBF condition then yields a linear constraint on $v_i$, used to adjust its bounds for safety.
 
 ---
 
