@@ -2,7 +2,7 @@
 
 ## Overview
 
-This simulation models **Tactical Conflict Resolution (TCR)** for a grid-based urban airspace where aircraft (represented as 2D point-mass vehicles) travel along orthogonal corridors. The core logic implements **Control Barrier Functions (CBFs)** to modulate vehicle speeds and maintain **safe separation** at intersections. The control is **centralised and ground-based**, making it ideal for **UAS Traffic Management (UTM)** systems operating in structured low-altitude corridors.
+This simulation models **Tactical Conflict Resolution** for a grid-based urban airspace where aircraft (represented as 2D point-mass vehicles) travel along orthogonal corridors. The core logic implements **Control Barrier Functions (CBFs)** to modulate vehicle speeds and maintain **safe separation** at intersections. The control is **centralised and ground-based**, making it ideal for **UAS Traffic Management** systems operating in structured low-altitude corridors.
 
 ---
 
