@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-import numpy as np
-import matplotlib.pyplot as plt
+
 from matplotlib.animation import FuncAnimation
+from shapely.geometry import LineString
+import matplotlib.pyplot as plt
+import numpy as np
 import random
 
 def main():
-    approach = 'grid'#, 'general'
+    approach = 'general'#, 'grid'
     sim = Simulation(approach)
 
     for t in range(sim.steps):
@@ -16,7 +18,7 @@ def main():
 # Force encoding : linear, no fp, and also compare horiwontal traje to ignore the deconfliction.
 
 class Simulation:
-    def __init__(self, approach, tsim=20, dt=0.05, n_vehicles=6):
+    def __init__(self, approach, tsim=20, dt=0.05, n_vehicles=10):
         self.approach = approach
         self.dt = dt                        # Time step (s)
         self.tsim = tsim
@@ -53,23 +55,23 @@ class Simulation:
             pi = self.traffic.pos_hist[ownship_idx, t]
             LB, UB = -np.inf, np.inf
             for intruder_idx in range(self.n_vehicles):
-                if ownship_idx == intruder_idx:
+                if ownship_idx == intruder_idx or (self.traffic.passing_deadlock(ownship_idx, intruder_idx) and self.traffic.get_priority(ownship_idx, intruder_idx)):
                     continue
 
                 pj = self.traffic.pos_hist[intruder_idx, t]
                 diff = pi - pj
-                h_val = diff.dot(diff) - self.solver.los**2
+                h_val = diff.dot(diff) - self.solver.lowc**2
                 grad_h = 2 * diff
 
-                dir_i = self.airspace.flight_plans['paths'][ownship_idx](self.traffic.pos[ownship_idx] + self.epsilon) - pi
-                dir_j = self.airspace.flight_plans['paths'][intruder_idx](self.traffic.pos[intruder_idx] + self.epsilon) - pj
+                dir_own = self.airspace.flight_plans['paths'][ownship_idx](self.traffic.pos[ownship_idx] + self.epsilon) - pi
+                dir_int = self.airspace.flight_plans['paths'][intruder_idx](self.traffic.pos[intruder_idx] + self.epsilon) - pj
 
                 # Normalize directions to avoid influence from path scale
-                dir_i /= np.linalg.norm(dir_i) + self.epsilon
-                dir_j /= np.linalg.norm(dir_j) + self.epsilon
+                dir_own /= np.linalg.norm(dir_own) + self.epsilon
+                dir_int /= np.linalg.norm(dir_int) + self.epsilon
 
-                Lf_h = -grad_h.dot(dir_j) * self.traffic.v_prev[intruder_idx]
-                a = grad_h.dot(dir_i)
+                Lf_h = -grad_h.dot(dir_int) * self.traffic.v_prev[intruder_idx]
+                a = grad_h.dot(dir_own)
                 b = -(Lf_h + self.solver.alpha * h_val)
 
                 if abs(a) < self.epsilon:
@@ -79,8 +81,9 @@ class Simulation:
                 else:
                     UB = min(UB, b / a)
 
-            v_i = np.clip(self.traffic.ini_spd[ownship_idx], LB, UB)
-            self.v_new[ownship_idx] = max(0.0, v_i)
+            v_i = max(self.traffic.spd_floor, np.clip(self.traffic.ini_spd[ownship_idx], LB, UB)) 
+
+            self.v_new[ownship_idx] = v_i
 
     def step_grid(self, t):
         for ownship_idx in range(self.n_vehicles):
@@ -113,11 +116,11 @@ class Simulation:
                     h_val = diff.dot(diff) - self.solver.los**2
                     grad_h = 2 * diff
 
-                    dir_i = np.array([1.0, 0.0]) if horizontal_own else np.array([0.0, 1.0])
-                    dir_j = np.array([1.0, 0.0]) if horizontal_int else np.array([0.0, 1.0])
+                    dir_own = np.array([1.0, 0.0]) if horizontal_own else np.array([0.0, 1.0])
+                    dir_int = np.array([1.0, 0.0]) if horizontal_int else np.array([0.0, 1.0])
 
-                    Lf_h = -grad_h.dot(dir_j) * self.traffic.v_prev[intruder_idx]
-                    a = grad_h.dot(dir_i)
+                    Lf_h = -grad_h.dot(dir_int) * self.traffic.v_prev[intruder_idx]
+                    a = grad_h.dot(dir_own)
                     b = -(Lf_h + self.solver.alpha * h_val)
                     if abs(a) < self.epsilon:
                         continue
@@ -195,9 +198,10 @@ class Simulation:
             plt.close(fig)
 
 class ControlBarrier:
-    def __init__(self, los=1.0, alpha  = 1.0):
-        self.los = los                 # Sector center, x coordinate.
-        self.alpha = alpha             # CBF gain
+    def __init__(self, lowc= 1.0, nmac= 0.5, alpha= 1.0):
+        self.lowc = lowc             
+        self.nmac = nmac              
+        self.alpha = alpha # CBF gain
 
 class Traffic:
     def __init__(self, steps, n_vehicles):
@@ -207,8 +211,9 @@ class Traffic:
         self.priority =  np.zeros(self.n_vehicles)
         self.ini_spd = np.random.uniform(1, 5, size=(self.n_vehicles))
 
-        self.pos = np.zeros(self.n_vehicles)                       # path parameters
+        self.pos = np.zeros(self.n_vehicles) # path parameters
         self.v_prev = self.ini_spd
+        self.spd_floor = 0.05
 
         self.pos_hist = np.zeros((self.n_vehicles, self.steps, 2)) # record positions
 
@@ -216,8 +221,14 @@ class Traffic:
         for ac in range(self.n_vehicles):
             self.pos_hist[ac, time] = flight_plans['paths'][ac](self.pos[ac])
 
+    def passing_deadlock(self, ownship_idx, intruder_idx):
+        return self.v_prev[ownship_idx] == self.spd_floor and self.v_prev[intruder_idx] == self.spd_floor
+
+    def get_priority(self, ownship_idx, intruder_idx):
+        return self.priority[ownship_idx] >= self.priority[intruder_idx]
+
 class Airspace:
-    def __init__(self, n_vehicles, approach, corridor_sep = 3.0, box=7):
+    def __init__(self, n_vehicles, approach, corridor_sep = 3.0, box=15):
         self.n_vehicles = n_vehicles
         self.corridor_sep = corridor_sep
         self.box = box
@@ -249,8 +260,6 @@ class Airspace:
         self.xmin, self.ymin = np.min(all_points, axis=0) - 0.2
         self.xmax, self.ymax = np.max(all_points, axis=0) + 0.2
 
-        print(f'paths: {paths}')
-
         self.flight_plans = {'origins': origins,
                              'destinations': destinations,
                              'heading': heading,
@@ -270,7 +279,6 @@ class Airspace:
     @property
     def generate_paths(self):
         return [lambda s, y=y: np.array([s - self.flight_plans['path length']/2, y]) for y in self.flight_plans['latitude']] + [lambda s, x=x: np.array([x, s - self.flight_plans['path length']/2]) for x in self.flight_plans['longitude']]
-
 
 if __name__ == "__main__":
     main()
